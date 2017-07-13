@@ -148,6 +148,17 @@ do_dm_op(
     unsigned int nr_bufs,
     XEN_GUEST_HANDLE_PARAM(xen_dm_op_buf_t) bufs);
 
+extern long
+do_vmcs_op(
+    uint16_t domain_id,
+    unsigned long field,
+    unsigned long value);
+
+extern long
+do_vmwrite_2(
+    unsigned int op1,
+    unsigned int op2);
+
 #ifdef CONFIG_COMPAT
 
 extern int

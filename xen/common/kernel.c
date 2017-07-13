@@ -462,6 +462,85 @@ DO(vm_assist)(unsigned int cmd, unsigned int type)
 }
 #endif
 
+/* Begin Custom hypercalls */
+#include <xen/sched.h>
+#include <asm/hvm/vmx/vmx.h>
+
+DO(vmcs_op)(uint16_t domain_id, unsigned long field, unsigned long value)
+{
+    struct vcpu *vcpu_cur = current;
+    long unsigned int val; // XXX Testing
+    unsigned int counter = 0;
+    // Loop over the current vcpu until we find the domain that we want (domain_id will be the domain that we want)
+    if ( vcpu_cur == NULL ) {
+        printk("Hypercall-vmcs_op: Current vcpu returned as NULL (1)\n");
+        return 1;
+    }
+    while ( vcpu_cur->domain->next_in_list != NULL ) {
+        printk("Hypercall-vmcs_op: vcpu_cur->vcpu_id: %u\n", vcpu_cur->vcpu_id); // XXX Debug
+        printk("Hypercall-vmcs_op: vcpu_cur->domain->domain_id: %u\n", vcpu_cur->domain->domain_id); // XXX Debug
+        printk("Hypercall-vmcs_op: vcpu_cur->domain->next_in_list->domain_id: %u\n", vcpu_cur->domain->next_in_list->domain_id); // XXX Debug
+        printk("Hypercall-vmcs_op: vcpu_cur->domain->next_in_list->max_vcpus: %u\n", vcpu_cur->domain->next_in_list->max_vcpus); // XXX Debug
+        vcpu_cur = vcpu_cur->domain->next_in_list->vcpu[0]; // Take a VCPU from the next domain as current
+        if (vcpu_cur->domain->domain_id == domain_id ) { // Check if this is the domain that we want
+            break;
+        }
+        counter++;
+        if ( counter >= 10 ) { // Return if we expire sufficient attempts. Any more than ten domains seems unlikely.
+            printk("Hypercall-vmcs_op: No domain for ID %u found after %d attempts\n", domain_id, counter);
+            return 1;
+        }
+    }
+    // At this point, we should have found a VCPU that reflects the domain that we want. Do a sanity check.
+    // XXX This is kind of a debug check. Need to fix the logic above.
+    if ( vcpu_cur->domain->domain_id != domain_id ) {
+        printk("Current VCPU's domain is %u, but we need %u. Aborting.\n", vcpu_cur->domain->domain_id, domain_id);
+        return 1;
+    }
+    // Traverse the VCPU linked list and modify all of of the VCPUs.
+    counter = 1;
+    if ( vcpu_cur == NULL ) {
+        printk("Hypercall-vmcs_op: Current vcpu returned as NULL (2)\n");
+        return 1;
+    }
+    while ( vcpu_cur != NULL ) {
+        __vmptrld(vcpu_cur->arch.hvm_vmx.vmcs_pa); // Initialize the VMCS for the VCPU
+        __vmread(field, &val); // Read the value, to see what it is before we've changed it
+        printk("Hypercall-vmcs_op: XXX unsigned long val: %lu\n", val); // XXX Testing
+        printk("Hypercall-vmcs_op: vcpu_cur->arch.hvm_vmx.exec_control: %u\n", vcpu_cur->arch.hvm_vmx.exec_control); // XXX Debug
+        vcpu_cur->arch.hvm_vmx.exec_control |= value;
+        printk("Hypercall-vmcs_op: vcpu_cur->arch.hvm_vmx.exec_control: %u\n", vcpu_cur->arch.hvm_vmx.exec_control); // XXX Debug
+        __vmwrite(field, vcpu_cur->arch.hvm_vmx.exec_control);
+        //__vmwrite(field, value);
+        __vmread(field, &val); // Read the value, to see what it is after we've changed it
+        printk("Hypercall-vmcs_op: XXX unsigned long val: %lu\n", val); // XXX Testing
+        printk("Hypercall-vmcs_op: Do __vmptrld, __vmwrite, etc etc on vcpu_id: %d\n", vcpu_cur->vcpu_id);
+        if ( vcpu_cur->next_in_list != NULL ) { // XXX This should not be necessary, since the while loop checks NULL
+            vcpu_cur = vcpu_cur->next_in_list; // Move on to the next one
+        } else {
+            printk("Hypercall-vmcs_op: Breaking out of loop because vcpu_cur->next_in_list == NULL\n"); // XXX Debug
+            break;
+        }
+        counter++;
+        if ( counter > vcpu_cur->domain->max_vcpus ) { // Return? (linked list NULL should be encountered first)
+            printk("Hypercall-vmcs_op: Finished after %u iterations on %u VCPUs\n", counter, vcpu_cur->domain->max_vcpus);
+            return 1;
+        }
+    }
+    printk("Hypercall-vmcs_op: called\n");
+    printk("Hypercall-vmcs_op: Inputs (domain_id, field, value): %u, %lu, %lu\n", domain_id, field, value);
+    return 1;
+}
+
+DO(vmwrite_2)(unsigned int op1, unsigned int op2)
+{
+    printk("vmwrite_2 called\n");
+    printk("Inputs (op1, op2): %u, %u\n", op1, op2);
+    return 1;
+}
+
+/* End Custom hypercalls */
+
 /*
  * Local variables:
  * mode: C
