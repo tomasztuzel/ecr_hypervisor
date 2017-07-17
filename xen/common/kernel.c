@@ -467,7 +467,7 @@ DO(vm_assist)(unsigned int cmd, unsigned int type)
 #include <asm/hvm/vmx/vmx.h>
 #include <asm/hvm/vmx/vmcs.h>
 
-DO(vmcs_op)(uint16_t domain_id, unsigned long field, unsigned long value)
+DO(vmcs_op)(uint16_t domain_id, unsigned long field, unsigned long value, bool enable)
 {
     struct vcpu *vcpu_cur = current;
     long unsigned int val; // XXX Testing
@@ -511,18 +511,26 @@ DO(vmcs_op)(uint16_t domain_id, unsigned long field, unsigned long value)
         switch ( field ) {
             case CPU_BASED_VM_EXEC_CONTROL:
                 printk("Hypercall-vmcs_op: vcpu_cur->arch.hvm_vmx.exec_control: %u\n", vcpu_cur->arch.hvm_vmx.exec_control); // XXX Debug
-                printk("Hypercall-vmcs_op: vcpu_cur->arch.hvm_vmx.exec_control: %u\n", vcpu_cur->arch.hvm_vmx.exec_control); // XXX Debug
-                vcpu_cur->arch.hvm_vmx.exec_control |= value;
+                if ( enable ) { // Enable or disable
+                    vcpu_cur->arch.hvm_vmx.exec_control |= value;
+                } else {
+                    vcpu_cur->arch.hvm_vmx.exec_control &= ~value;
+                }
                 __vmwrite(field, vcpu_cur->arch.hvm_vmx.exec_control);
                 printk("Hypercall-vmcs_op: vcpu_cur->arch.hvm_vmx.exec_control: %u\n", vcpu_cur->arch.hvm_vmx.exec_control); // XXX Debug
                 break;
             case SECONDARY_VM_EXEC_CONTROL:
                 printk("Hypercall-vmcs_op: vcpu_cur->arch.hvm_vmx.exec_control: %u\n", vcpu_cur->arch.hvm_vmx.exec_control); // XXX Debug
-                vcpu_cur->arch.hvm_vmx.exec_control |= CPU_BASED_ACTIVATE_SECONDARY_CONTROLS; // Use this to disable instead of '|=': '& ~='
+                vcpu_cur->arch.hvm_vmx.exec_control |= CPU_BASED_ACTIVATE_SECONDARY_CONTROLS;
                 __vmwrite(CPU_BASED_VM_EXEC_CONTROL, vcpu_cur->arch.hvm_vmx.exec_control);
                 printk("Hypercall-vmcs_op: vcpu_cur->arch.hvm_vmx.exec_control: %u\n", vcpu_cur->arch.hvm_vmx.exec_control); // XXX Debug
                 printk("Hypercall-vmcs_op: vcpu_cur->arch.hvm_vmx.secondary_exec_control: %u\n", vcpu_cur->arch.hvm_vmx.secondary_exec_control); // XXX Debug
                 vcpu_cur->arch.hvm_vmx.secondary_exec_control |= value;
+                if ( enable ) { // Enable or disable
+                    vcpu_cur->arch.hvm_vmx.secondary_exec_control |= value;
+                } else {
+                    vcpu_cur->arch.hvm_vmx.secondary_exec_control &= ~value;
+                }
                 __vmwrite(field, vcpu_cur->arch.hvm_vmx.secondary_exec_control);
                 printk("Hypercall-vmcs_op: vcpu_cur->arch.hvm_vmx.secondary_exec_control: %u\n", vcpu_cur->arch.hvm_vmx.secondary_exec_control); // XXX Debug
                 break;

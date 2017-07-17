@@ -152,7 +152,8 @@ extern long
 do_vmcs_op(
     uint16_t domain_id,
     unsigned long field,
-    unsigned long value);
+    unsigned long value,
+    bool enable);
 
 extern long
 do_vmwrite_2(
