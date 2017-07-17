@@ -465,6 +465,7 @@ DO(vm_assist)(unsigned int cmd, unsigned int type)
 /* Begin Custom hypercalls */
 #include <xen/sched.h>
 #include <asm/hvm/vmx/vmx.h>
+#include <asm/hvm/vmx/vmcs.h>
 
 DO(vmcs_op)(uint16_t domain_id, unsigned long field, unsigned long value)
 {
@@ -507,14 +508,31 @@ DO(vmcs_op)(uint16_t domain_id, unsigned long field, unsigned long value)
         __vmptrld(vcpu_cur->arch.hvm_vmx.vmcs_pa); // Initialize the VMCS for the VCPU
         __vmread(field, &val); // Read the value, to see what it is before we've changed it
         printk("Hypercall-vmcs_op: XXX unsigned long val: %lu\n", val); // XXX Testing
-        printk("Hypercall-vmcs_op: vcpu_cur->arch.hvm_vmx.exec_control: %u\n", vcpu_cur->arch.hvm_vmx.exec_control); // XXX Debug
-        vcpu_cur->arch.hvm_vmx.exec_control |= value;
-        printk("Hypercall-vmcs_op: vcpu_cur->arch.hvm_vmx.exec_control: %u\n", vcpu_cur->arch.hvm_vmx.exec_control); // XXX Debug
-        __vmwrite(field, vcpu_cur->arch.hvm_vmx.exec_control);
-        //__vmwrite(field, value);
+        switch ( field ) {
+            case CPU_BASED_VM_EXEC_CONTROL:
+                printk("Hypercall-vmcs_op: vcpu_cur->arch.hvm_vmx.exec_control: %u\n", vcpu_cur->arch.hvm_vmx.exec_control); // XXX Debug
+                printk("Hypercall-vmcs_op: vcpu_cur->arch.hvm_vmx.exec_control: %u\n", vcpu_cur->arch.hvm_vmx.exec_control); // XXX Debug
+                vcpu_cur->arch.hvm_vmx.exec_control |= value;
+                __vmwrite(field, vcpu_cur->arch.hvm_vmx.exec_control);
+                printk("Hypercall-vmcs_op: vcpu_cur->arch.hvm_vmx.exec_control: %u\n", vcpu_cur->arch.hvm_vmx.exec_control); // XXX Debug
+                break;
+            case SECONDARY_VM_EXEC_CONTROL:
+                printk("Hypercall-vmcs_op: vcpu_cur->arch.hvm_vmx.exec_control: %u\n", vcpu_cur->arch.hvm_vmx.exec_control); // XXX Debug
+                vcpu_cur->arch.hvm_vmx.exec_control |= CPU_BASED_ACTIVATE_SECONDARY_CONTROLS; // Use this to disable instead of '|=': '& ~='
+                __vmwrite(CPU_BASED_VM_EXEC_CONTROL, vcpu_cur->arch.hvm_vmx.exec_control);
+                printk("Hypercall-vmcs_op: vcpu_cur->arch.hvm_vmx.exec_control: %u\n", vcpu_cur->arch.hvm_vmx.exec_control); // XXX Debug
+                printk("Hypercall-vmcs_op: vcpu_cur->arch.hvm_vmx.secondary_exec_control: %u\n", vcpu_cur->arch.hvm_vmx.secondary_exec_control); // XXX Debug
+                vcpu_cur->arch.hvm_vmx.secondary_exec_control |= value;
+                __vmwrite(field, vcpu_cur->arch.hvm_vmx.secondary_exec_control);
+                printk("Hypercall-vmcs_op: vcpu_cur->arch.hvm_vmx.secondary_exec_control: %u\n", vcpu_cur->arch.hvm_vmx.secondary_exec_control); // XXX Debug
+                break;
+            default:
+                printk("Unknown field type\n");
+                break;
+        }
         __vmread(field, &val); // Read the value, to see what it is after we've changed it
         printk("Hypercall-vmcs_op: XXX unsigned long val: %lu\n", val); // XXX Testing
-        printk("Hypercall-vmcs_op: Do __vmptrld, __vmwrite, etc etc on vcpu_id: %d\n", vcpu_cur->vcpu_id);
+        printk("Hypercall-vmcs_op: Did __vmptrld, __vmwrite, etc etc on vcpu_id: %d\n", vcpu_cur->vcpu_id);
         if ( vcpu_cur->next_in_list != NULL ) { // XXX This should not be necessary, since the while loop checks NULL
             vcpu_cur = vcpu_cur->next_in_list; // Move on to the next one
         } else {
