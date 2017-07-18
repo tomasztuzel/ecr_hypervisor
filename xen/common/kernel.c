@@ -470,6 +470,7 @@ DO(vm_assist)(unsigned int cmd, unsigned int type)
 DO(vmcs_op)(uint16_t domain_id, unsigned long field, unsigned long value, bool enable)
 {
     struct vcpu *vcpu_cur = current;
+    struct vcpu *vcpu_cur2;
     long unsigned int val; // XXX Testing
     unsigned int counter = 0;
     // Loop over the current vcpu until we find the domain that we want (domain_id will be the domain that we want)
@@ -499,40 +500,35 @@ DO(vmcs_op)(uint16_t domain_id, unsigned long field, unsigned long value, bool e
         return 1;
     }
     // Traverse the VCPU linked list and modify all of of the VCPUs.
-    counter = 1;
-    if ( vcpu_cur == NULL ) {
-        printk("Hypercall-vmcs_op: Current vcpu returned as NULL (2)\n");
-        return 1;
-    }
-    while ( vcpu_cur != NULL ) {
-        __vmptrld(vcpu_cur->arch.hvm_vmx.vmcs_pa); // Initialize the VMCS for the VCPU
+    for_each_vcpu( vcpu_cur->domain, vcpu_cur2 ) {
+        __vmptrld(vcpu_cur2->arch.hvm_vmx.vmcs_pa); // Initialize the VMCS for the VCPU
         __vmread(field, &val); // Read the value, to see what it is before we've changed it
         printk("Hypercall-vmcs_op: XXX unsigned long val: %lu\n", val); // XXX Testing
         switch ( field ) {
             case CPU_BASED_VM_EXEC_CONTROL:
-                printk("Hypercall-vmcs_op: vcpu_cur->arch.hvm_vmx.exec_control: %u\n", vcpu_cur->arch.hvm_vmx.exec_control); // XXX Debug
+                printk("Hypercall-vmcs_op: vcpu_cur2->arch.hvm_vmx.exec_control: %u\n", vcpu_cur2->arch.hvm_vmx.exec_control); // XXX Debug
                 if ( enable ) { // Enable or disable
-                    vcpu_cur->arch.hvm_vmx.exec_control |= value;
+                    vcpu_cur2->arch.hvm_vmx.exec_control |= value;
                 } else {
-                    vcpu_cur->arch.hvm_vmx.exec_control &= ~value;
+                    vcpu_cur2->arch.hvm_vmx.exec_control &= ~value;
                 }
-                __vmwrite(field, vcpu_cur->arch.hvm_vmx.exec_control);
-                printk("Hypercall-vmcs_op: vcpu_cur->arch.hvm_vmx.exec_control: %u\n", vcpu_cur->arch.hvm_vmx.exec_control); // XXX Debug
+                __vmwrite(field, vcpu_cur2->arch.hvm_vmx.exec_control);
+                printk("Hypercall-vmcs_op: vcpu_cur2->arch.hvm_vmx.exec_control: %u\n", vcpu_cur2->arch.hvm_vmx.exec_control); // XXX Debug
                 break;
             case SECONDARY_VM_EXEC_CONTROL:
-                printk("Hypercall-vmcs_op: vcpu_cur->arch.hvm_vmx.exec_control: %u\n", vcpu_cur->arch.hvm_vmx.exec_control); // XXX Debug
-                vcpu_cur->arch.hvm_vmx.exec_control |= CPU_BASED_ACTIVATE_SECONDARY_CONTROLS;
-                __vmwrite(CPU_BASED_VM_EXEC_CONTROL, vcpu_cur->arch.hvm_vmx.exec_control);
-                printk("Hypercall-vmcs_op: vcpu_cur->arch.hvm_vmx.exec_control: %u\n", vcpu_cur->arch.hvm_vmx.exec_control); // XXX Debug
-                printk("Hypercall-vmcs_op: vcpu_cur->arch.hvm_vmx.secondary_exec_control: %u\n", vcpu_cur->arch.hvm_vmx.secondary_exec_control); // XXX Debug
-                vcpu_cur->arch.hvm_vmx.secondary_exec_control |= value;
+                printk("Hypercall-vmcs_op: vcpu_cur2->arch.hvm_vmx.exec_control: %u\n", vcpu_cur2->arch.hvm_vmx.exec_control); // XXX Debug
+                vcpu_cur2->arch.hvm_vmx.exec_control |= CPU_BASED_ACTIVATE_SECONDARY_CONTROLS;
+                __vmwrite(CPU_BASED_VM_EXEC_CONTROL, vcpu_cur2->arch.hvm_vmx.exec_control);
+                printk("Hypercall-vmcs_op: vcpu_cur2->arch.hvm_vmx.exec_control: %u\n", vcpu_cur2->arch.hvm_vmx.exec_control); // XXX Debug
+                printk("Hypercall-vmcs_op: vcpu_cur2->arch.hvm_vmx.secondary_exec_control: %u\n", vcpu_cur2->arch.hvm_vmx.secondary_exec_control); // XXX Debug
+                vcpu_cur2->arch.hvm_vmx.secondary_exec_control |= value;
                 if ( enable ) { // Enable or disable
-                    vcpu_cur->arch.hvm_vmx.secondary_exec_control |= value;
+                    vcpu_cur2->arch.hvm_vmx.secondary_exec_control |= value;
                 } else {
-                    vcpu_cur->arch.hvm_vmx.secondary_exec_control &= ~value;
+                    vcpu_cur2->arch.hvm_vmx.secondary_exec_control &= ~value;
                 }
-                __vmwrite(field, vcpu_cur->arch.hvm_vmx.secondary_exec_control);
-                printk("Hypercall-vmcs_op: vcpu_cur->arch.hvm_vmx.secondary_exec_control: %u\n", vcpu_cur->arch.hvm_vmx.secondary_exec_control); // XXX Debug
+                __vmwrite(field, vcpu_cur2->arch.hvm_vmx.secondary_exec_control);
+                printk("Hypercall-vmcs_op: vcpu_cur2->arch.hvm_vmx.secondary_exec_control: %u\n", vcpu_cur2->arch.hvm_vmx.secondary_exec_control); // XXX Debug
                 break;
             default:
                 printk("Unknown field type\n");
@@ -540,18 +536,7 @@ DO(vmcs_op)(uint16_t domain_id, unsigned long field, unsigned long value, bool e
         }
         __vmread(field, &val); // Read the value, to see what it is after we've changed it
         printk("Hypercall-vmcs_op: XXX unsigned long val: %lu\n", val); // XXX Testing
-        printk("Hypercall-vmcs_op: Did __vmptrld, __vmwrite, etc etc on vcpu_id: %d\n", vcpu_cur->vcpu_id);
-        if ( vcpu_cur->next_in_list != NULL ) { // XXX This should not be necessary, since the while loop checks NULL
-            vcpu_cur = vcpu_cur->next_in_list; // Move on to the next one
-        } else {
-            printk("Hypercall-vmcs_op: Breaking out of loop because vcpu_cur->next_in_list == NULL\n"); // XXX Debug
-            break;
-        }
-        counter++;
-        if ( counter > vcpu_cur->domain->max_vcpus ) { // Return? (linked list NULL should be encountered first)
-            printk("Hypercall-vmcs_op: Finished after %u iterations on %u VCPUs\n", counter, vcpu_cur->domain->max_vcpus);
-            return 1;
-        }
+        printk("Hypercall-vmcs_op: Did __vmptrld, __vmwrite, etc etc on vcpu_id: %d\n", vcpu_cur2->vcpu_id);
     }
     printk("Hypercall-vmcs_op: called\n");
     printk("Hypercall-vmcs_op: Inputs (domain_id, field, value): %u, %lu, %lu\n", domain_id, field, value);
