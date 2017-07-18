@@ -500,6 +500,7 @@ DO(vmcs_op)(uint16_t domain_id, unsigned long field, unsigned long value, bool e
         return 1;
     }
     // Traverse the VCPU linked list and modify all of of the VCPUs.
+    domain_pause( vcpu_cur->domain );
     for_each_vcpu( vcpu_cur->domain, vcpu_cur2 ) {
         __vmptrld(vcpu_cur2->arch.hvm_vmx.vmcs_pa); // Initialize the VMCS for the VCPU
         __vmread(field, &val); // Read the value, to see what it is before we've changed it
@@ -538,6 +539,7 @@ DO(vmcs_op)(uint16_t domain_id, unsigned long field, unsigned long value, bool e
         printk("Hypercall-vmcs_op: XXX unsigned long val: %lu\n", val); // XXX Testing
         printk("Hypercall-vmcs_op: Did __vmptrld, __vmwrite, etc etc on vcpu_id: %d\n", vcpu_cur2->vcpu_id);
     }
+    domain_unpause( vcpu_cur->domain );
     printk("Hypercall-vmcs_op: called\n");
     printk("Hypercall-vmcs_op: Inputs (domain_id, field, value): %u, %lu, %lu\n", domain_id, field, value);
     return 1;
