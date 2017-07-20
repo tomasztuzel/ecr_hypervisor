@@ -483,7 +483,7 @@ DO(vmcs_op)(uint16_t domain_id, unsigned long field, unsigned long value, bool e
     // Traverse the VCPU linked list and modify all of of the VCPUs.
     domain_pause( dom_cur );
     for_each_vcpu( dom_cur, vcpu_cur ) {
-        __vmptrld(vcpu_cur->arch.hvm_vmx.vmcs_pa); // Initialize the VMCS for the VCPU
+        vmx_vmcs_enter( vcpu_cur );
         __vmread(field, &val); // Read the value, to see what it is before we've changed it
         printk("Hypercall-vmcs_op: Pre-vmwrite value of field 0x%lx: 0x%lx\n", field, val);
         switch ( field ) {
@@ -523,6 +523,7 @@ DO(vmcs_op)(uint16_t domain_id, unsigned long field, unsigned long value, bool e
                 break;
         }
         __vmread(field, &val); // Read the value, to see what it is after we've changed it
+        vmx_vmcs_exit( vcpu_cur );
         printk("Hypercall-vmcs_op: Post-vmwrite value of field 0x%lx: 0x%lx\n", field, val);
         printk("Hypercall-vmcs_op: Finished operation on VCPU ID %d\n", vcpu_cur->vcpu_id);
     }
