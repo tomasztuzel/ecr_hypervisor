@@ -469,79 +469,64 @@ DO(vm_assist)(unsigned int cmd, unsigned int type)
 
 DO(vmcs_op)(uint16_t domain_id, unsigned long field, unsigned long value, bool enable)
 {
-    struct vcpu *vcpu_cur = current;
-    struct vcpu *vcpu_cur2;
-    long unsigned int val; // XXX Testing
-    unsigned int counter = 0;
-    // Loop over the current vcpu until we find the domain that we want (domain_id will be the domain that we want)
-    if ( vcpu_cur == NULL ) {
-        printk("Hypercall-vmcs_op: Current vcpu returned as NULL (1)\n");
-        return 1;
-    }
-    while ( vcpu_cur->domain->next_in_list != NULL ) {
-        printk("Hypercall-vmcs_op: vcpu_cur->vcpu_id: %u\n", vcpu_cur->vcpu_id); // XXX Debug
-        printk("Hypercall-vmcs_op: vcpu_cur->domain->domain_id: %u\n", vcpu_cur->domain->domain_id); // XXX Debug
-        printk("Hypercall-vmcs_op: vcpu_cur->domain->next_in_list->domain_id: %u\n", vcpu_cur->domain->next_in_list->domain_id); // XXX Debug
-        printk("Hypercall-vmcs_op: vcpu_cur->domain->next_in_list->max_vcpus: %u\n", vcpu_cur->domain->next_in_list->max_vcpus); // XXX Debug
-        vcpu_cur = vcpu_cur->domain->next_in_list->vcpu[0]; // Take a VCPU from the next domain as current
-        if (vcpu_cur->domain->domain_id == domain_id ) { // Check if this is the domain that we want
-            break;
-        }
-        counter++;
-        if ( counter >= 10 ) { // Return if we expire sufficient attempts. Any more than ten domains seems unlikely.
-            printk("Hypercall-vmcs_op: No domain for ID %u found after %d attempts\n", domain_id, counter);
-            return 1;
-        }
-    }
-    // At this point, we should have found a VCPU that reflects the domain that we want. Do a sanity check.
-    // XXX This is kind of a debug check. Need to fix the logic above.
-    if ( vcpu_cur->domain->domain_id != domain_id ) {
-        printk("Current VCPU's domain is %u, but we need %u. Aborting.\n", vcpu_cur->domain->domain_id, domain_id);
-        return 1;
+    struct domain *dom_cur;
+    struct vcpu *vcpu_cur;
+    long unsigned int val;
+
+    printk("Hypercall-vmcs_op: Inputs (domain_id, field, value): 0x%x, 0x%lx, 0x%lx\n", domain_id, field, value);
+
+    dom_cur = get_domain_by_id( (domid_t) domain_id );
+    if ( dom_cur == NULL ) {
+        printk("Domain with ID %u not found.\n", domain_id);
+        return -EINVAL;
     }
     // Traverse the VCPU linked list and modify all of of the VCPUs.
-    domain_pause( vcpu_cur->domain );
-    for_each_vcpu( vcpu_cur->domain, vcpu_cur2 ) {
-        __vmptrld(vcpu_cur2->arch.hvm_vmx.vmcs_pa); // Initialize the VMCS for the VCPU
+    domain_pause( dom_cur );
+    for_each_vcpu( dom_cur, vcpu_cur ) {
+        __vmptrld(vcpu_cur->arch.hvm_vmx.vmcs_pa); // Initialize the VMCS for the VCPU
         __vmread(field, &val); // Read the value, to see what it is before we've changed it
-        printk("Hypercall-vmcs_op: XXX unsigned long val: %lu\n", val); // XXX Testing
+        printk("Hypercall-vmcs_op: Pre-vmwrite value of field 0x%lx: 0x%lx\n", field, val);
         switch ( field ) {
             case CPU_BASED_VM_EXEC_CONTROL:
-                printk("Hypercall-vmcs_op: vcpu_cur2->arch.hvm_vmx.exec_control: %u\n", vcpu_cur2->arch.hvm_vmx.exec_control); // XXX Debug
+                printk("Hypercall-vmcs_op: Pre-vmwrite execution control value: 0x%x\n", \
+                    vcpu_cur->arch.hvm_vmx.exec_control);
                 if ( enable ) { // Enable or disable
-                    vcpu_cur2->arch.hvm_vmx.exec_control |= value;
+                    vcpu_cur->arch.hvm_vmx.exec_control |= value;
                 } else {
-                    vcpu_cur2->arch.hvm_vmx.exec_control &= ~value;
+                    vcpu_cur->arch.hvm_vmx.exec_control &= ~value;
                 }
-                __vmwrite(field, vcpu_cur2->arch.hvm_vmx.exec_control);
-                printk("Hypercall-vmcs_op: vcpu_cur2->arch.hvm_vmx.exec_control: %u\n", vcpu_cur2->arch.hvm_vmx.exec_control); // XXX Debug
+                __vmwrite(field, vcpu_cur->arch.hvm_vmx.exec_control);
+                printk("Hypercall-vmcs_op: Post-vmwrite execution control value: 0x%x\n", \
+                    vcpu_cur->arch.hvm_vmx.exec_control);
                 break;
             case SECONDARY_VM_EXEC_CONTROL:
-                printk("Hypercall-vmcs_op: vcpu_cur2->arch.hvm_vmx.exec_control: %u\n", vcpu_cur2->arch.hvm_vmx.exec_control); // XXX Debug
-                vcpu_cur2->arch.hvm_vmx.exec_control |= CPU_BASED_ACTIVATE_SECONDARY_CONTROLS;
-                __vmwrite(CPU_BASED_VM_EXEC_CONTROL, vcpu_cur2->arch.hvm_vmx.exec_control);
-                printk("Hypercall-vmcs_op: vcpu_cur2->arch.hvm_vmx.exec_control: %u\n", vcpu_cur2->arch.hvm_vmx.exec_control); // XXX Debug
-                printk("Hypercall-vmcs_op: vcpu_cur2->arch.hvm_vmx.secondary_exec_control: %u\n", vcpu_cur2->arch.hvm_vmx.secondary_exec_control); // XXX Debug
-                vcpu_cur2->arch.hvm_vmx.secondary_exec_control |= value;
+                printk("Hypercall-vmcs_op: Pre-vmwrite execution control value: 0x%x\n", \
+                    vcpu_cur->arch.hvm_vmx.exec_control);
+                printk("Hypercall-vmcs_op: Pre-vmwrite secondary execution control value: 0x%x\n", \
+                    vcpu_cur->arch.hvm_vmx.secondary_exec_control);
+                vcpu_cur->arch.hvm_vmx.exec_control |= CPU_BASED_ACTIVATE_SECONDARY_CONTROLS;
+                __vmwrite(CPU_BASED_VM_EXEC_CONTROL, vcpu_cur->arch.hvm_vmx.exec_control);
+                printk("Hypercall-vmcs_op: Post-vmwrite execution control value: 0x%x\n", \
+                    vcpu_cur->arch.hvm_vmx.exec_control);
+                vcpu_cur->arch.hvm_vmx.secondary_exec_control |= value;
                 if ( enable ) { // Enable or disable
-                    vcpu_cur2->arch.hvm_vmx.secondary_exec_control |= value;
+                    vcpu_cur->arch.hvm_vmx.secondary_exec_control |= value;
                 } else {
-                    vcpu_cur2->arch.hvm_vmx.secondary_exec_control &= ~value;
+                    vcpu_cur->arch.hvm_vmx.secondary_exec_control &= ~value;
                 }
-                __vmwrite(field, vcpu_cur2->arch.hvm_vmx.secondary_exec_control);
-                printk("Hypercall-vmcs_op: vcpu_cur2->arch.hvm_vmx.secondary_exec_control: %u\n", vcpu_cur2->arch.hvm_vmx.secondary_exec_control); // XXX Debug
+                __vmwrite(field, vcpu_cur->arch.hvm_vmx.secondary_exec_control);
+                printk("Hypercall-vmcs_op: Post-vmwrite secondary execution control value: 0x%x\n", \
+                    vcpu_cur->arch.hvm_vmx.secondary_exec_control);
                 break;
             default:
                 printk("Unknown field type\n");
                 break;
         }
         __vmread(field, &val); // Read the value, to see what it is after we've changed it
-        printk("Hypercall-vmcs_op: XXX unsigned long val: %lu\n", val); // XXX Testing
-        printk("Hypercall-vmcs_op: Did __vmptrld, __vmwrite, etc etc on vcpu_id: %d\n", vcpu_cur2->vcpu_id);
+        printk("Hypercall-vmcs_op: Post-vmwrite value of field 0x%lx: 0x%lx\n", field, val);
+        printk("Hypercall-vmcs_op: Finished operation on VCPU ID %d\n", vcpu_cur->vcpu_id);
     }
-    domain_unpause( vcpu_cur->domain );
-    printk("Hypercall-vmcs_op: called\n");
-    printk("Hypercall-vmcs_op: Inputs (domain_id, field, value): %u, %lu, %lu\n", domain_id, field, value);
+    domain_unpause( dom_cur );
     return 1;
 }
 
