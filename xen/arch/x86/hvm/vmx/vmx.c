@@ -4099,6 +4099,10 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
         vmx_handle_apic_write();
         break;
 
+    case EXIT_REASON_RDRAND: // Handle RDRAND exiting, but don't do anything (just a timing increase)
+        update_guest_eip(); /* Safe: RDRAND */
+        break;
+
     case EXIT_REASON_PML_FULL:
         vmx_vcpu_flush_pml_buffer(v);
         break;
