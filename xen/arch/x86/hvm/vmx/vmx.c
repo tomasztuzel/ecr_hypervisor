@@ -4125,7 +4125,9 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
         break;
 
     case EXIT_REASON_VMX_PREEMPTION_TIMER_EXPIRED:
-    case EXIT_REASON_INVPCID:
+    case EXIT_REASON_INVPCID: // Handle INVPCID exiting, but don't do anything (just a timing increase)
+        update_guest_eip(); /* Safe: INVPCID */
+        break;
     /* fall through */
     default:
     exit_and_crash:
