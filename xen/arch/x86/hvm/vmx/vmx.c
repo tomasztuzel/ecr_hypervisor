@@ -3876,6 +3876,9 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
         __vmread(EXIT_QUALIFICATION, &exit_qualification);
         vmx_invlpg_intercept(exit_qualification);
         break;
+    case EXIT_REASON_RDPMC: // Handle RDPMC exiting, but don't do anything (just a timing increase)
+        update_guest_eip(); /* Safe: RDPMC */
+        break;
     case EXIT_REASON_RDTSCP:
         regs->rcx = hvm_msr_tsc_aux(v);
         /* fall through */
