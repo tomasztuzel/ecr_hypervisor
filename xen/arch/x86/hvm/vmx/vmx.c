@@ -3883,6 +3883,8 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
         regs->rcx = hvm_msr_tsc_aux(v);
         /* fall through */
     case EXIT_REASON_RDTSC:
+        if ( rdtsc_alert && printk_ratelimit() )
+            printk(XENLOG_INFO "RDTSC occured while rdtsc_alert was set (this is a rate limited message)\n");
         update_guest_eip(); /* Safe: RDTSC, RDTSCP */
         hvm_rdtsc_intercept(regs);
         break;

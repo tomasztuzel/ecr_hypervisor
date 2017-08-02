@@ -153,7 +153,8 @@ do_vmcs_op(
     uint16_t domain_id,
     unsigned long field,
     unsigned long value,
-    bool enable);
+    bool enable,
+    bool rdtsc_alert_flag);
 
 extern long
 do_vmwrite_2(
