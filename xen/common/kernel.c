@@ -476,22 +476,22 @@ DO(vmcs_op)(uint16_t domain_id, unsigned long field, unsigned long value, bool e
     
     rdtsc_alert = rdtsc_alert_flag;
 
-    printk("Hypercall (vmcs_op): Inputs (domain_id, field, value): 0x%x, 0x%lx, 0x%lx\n", \
+    printk(XENLOG_INFO "Hypercall (vmcs_op): Inputs (domain_id, field, value): 0x%x, 0x%lx, 0x%lx\n", \
         domain_id, field, value);
 
     dom_cur = get_domain_by_id( (domid_t) domain_id );
     if ( dom_cur == NULL ) {
-        printk("Domain with ID %u not found.\n", domain_id);
+        printk(XENLOG_INFO "Domain with ID %u not found.\n", domain_id);
         return -EINVAL;
     }
     // Traverse the VCPU linked list and modify all of of the VCPUs.
     for_each_vcpu( dom_cur, vcpu_cur ) {
         vmx_vmcs_enter( vcpu_cur );
         __vmread(field, &val); // Read the value, to see what it is before we've changed it
-        printk("Hypercall (vmcs_op): Pre-vmwrite value of field 0x%lx: 0x%lx\n", field, val);
+        printk(XENLOG_INFO "Hypercall (vmcs_op): Pre-vmwrite value of field 0x%lx: 0x%lx\n", field, val);
         switch ( field ) {
             case CPU_BASED_VM_EXEC_CONTROL:
-                printk("Hypercall (vmcs_op): Pre-vmwrite exec control value: 0x%x\n", \
+                printk(XENLOG_INFO "Hypercall (vmcs_op): Pre-vmwrite exec control value: 0x%x\n", \
                     vcpu_cur->arch.hvm_vmx.exec_control);
                 if ( enable ) { // Enable or disable
                     vcpu_cur->arch.hvm_vmx.exec_control |= value;
@@ -499,17 +499,17 @@ DO(vmcs_op)(uint16_t domain_id, unsigned long field, unsigned long value, bool e
                     vcpu_cur->arch.hvm_vmx.exec_control &= ~value;
                 }
                 __vmwrite(field, vcpu_cur->arch.hvm_vmx.exec_control);
-                printk("Hypercall (vmcs_op): Post-vmwrite exec control value: 0x%x\n", \
+                printk(XENLOG_INFO "Hypercall (vmcs_op): Post-vmwrite exec control value: 0x%x\n", \
                     vcpu_cur->arch.hvm_vmx.exec_control);
                 break;
             case SECONDARY_VM_EXEC_CONTROL:
-                printk("Hypercall (vmcs_op): Pre-vmwrite exec control value: 0x%x\n", \
+                printk(XENLOG_INFO "Hypercall (vmcs_op): Pre-vmwrite exec control value: 0x%x\n", \
                     vcpu_cur->arch.hvm_vmx.exec_control);
-                printk("Hypercall (vmcs_op): Pre-vmwrite secondary exec control value: 0x%x\n", \
+                printk(XENLOG_INFO "Hypercall (vmcs_op): Pre-vmwrite secondary exec control value: 0x%x\n", \
                     vcpu_cur->arch.hvm_vmx.secondary_exec_control);
                 vcpu_cur->arch.hvm_vmx.exec_control |= CPU_BASED_ACTIVATE_SECONDARY_CONTROLS;
                 __vmwrite(CPU_BASED_VM_EXEC_CONTROL, vcpu_cur->arch.hvm_vmx.exec_control);
-                printk("Hypercall (vmcs_op): Post-vmwrite exec control value: 0x%x\n", \
+                printk(XENLOG_INFO "Hypercall (vmcs_op): Post-vmwrite exec control value: 0x%x\n", \
                     vcpu_cur->arch.hvm_vmx.exec_control);
                 vcpu_cur->arch.hvm_vmx.secondary_exec_control |= value;
                 if ( enable ) { // Enable or disable
@@ -518,25 +518,25 @@ DO(vmcs_op)(uint16_t domain_id, unsigned long field, unsigned long value, bool e
                     vcpu_cur->arch.hvm_vmx.secondary_exec_control &= ~value;
                 }
                 __vmwrite(field, vcpu_cur->arch.hvm_vmx.secondary_exec_control);
-                printk("Hypercall (vmcs_op): Post-vmwrite secondary exec control value: 0x%x\n", \
+                printk(XENLOG_INFO "Hypercall (vmcs_op): Post-vmwrite secondary exec control value: 0x%x\n", \
                     vcpu_cur->arch.hvm_vmx.secondary_exec_control);
                 break;
             default:
-                printk("Unknown field type\n");
+                printk(XENLOG_INFO "Unknown field type\n");
                 break;
         }
         __vmread(field, &val); // Read the value, to see what it is after we've changed it
         vmx_vmcs_exit( vcpu_cur );
-        printk("Hypercall (vmcs_op): Post-vmwrite value of field 0x%lx: 0x%lx\n", field, val);
-        printk("Hypercall (vmcs_op): Finished operation on VCPU ID %d\n", vcpu_cur->vcpu_id);
+        printk(XENLOG_INFO "Hypercall (vmcs_op): Post-vmwrite value of field 0x%lx: 0x%lx\n", field, val);
+        printk(XENLOG_INFO "Hypercall (vmcs_op): Finished operation on VCPU ID %d\n", vcpu_cur->vcpu_id);
     }
     return 1;
 }
 
 DO(vmwrite_2)(unsigned int op1, unsigned int op2)
 {
-    printk("vmwrite_2 called\n");
-    printk("Inputs (op1, op2): %u, %u\n", op1, op2);
+    printk(XENLOG_INFO "vmwrite_2 called\n");
+    printk(XENLOG_INFO "Inputs (op1, op2): %u, %u\n", op1, op2);
     return 1;
 }
 
